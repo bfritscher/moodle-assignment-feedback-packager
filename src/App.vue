@@ -23,6 +23,9 @@
         <p v-for="e in csv.errors">
           <strong>{{e.type}} (row: {{e.row}}):</strong> {{e.message}}.</p>
       </div>
+      <div class="toast" v-if="incomingFiles.length > 0 && !csv.meta">
+        Downloaded incoming files for you: {{incomingFiles.join(', ')}}
+      </div>
       <div class="empty file-drop-area" :class="{'is-active': csvDropActive}" v-show="!csv.meta">
         <div class="empty-icon">
           <i class="icon icon-upload"></i>
@@ -38,13 +41,13 @@
 
         <ul class="tab tab-block">
           <li class="tab-item">
-            <a href="#" class="badge" :data-badge="filteredGroups.length"   @click.prevent="activeTab = 'G'" :class="{active: activeTab === 'G'}">Groups</a>
+            <a href="#" class="badge" :data-badge="filteredGroups.length" @click.prevent="activeTab = 'G'" :class="{active: activeTab === 'G'}">Groups</a>
           </li>
           <li class="tab-item">
-            <a href="#" class="badge" :data-badge="files.length"  @click.prevent="activeTab = 'F'" :class="{active: activeTab === 'F'}">Feedback Files</a>
+            <a href="#" class="badge" :data-badge="files.length" @click.prevent="activeTab = 'F'" :class="{active: activeTab === 'F'}">Feedback Files</a>
           </li>
           <li class="tab-item">
-            <a href="#" class="badge" :data-badge="filteredStudents.length"   @click.prevent="activeTab = 'S'" :class="{active: activeTab === 'S'}">Participants</a>
+            <a href="#" class="badge" :data-badge="filteredStudents.length" @click.prevent="activeTab = 'S'" :class="{active: activeTab === 'S'}">Participants</a>
           </li>
           <li class="tab-item tab-action ml-10">
             <div class="input-group input-inline">
@@ -77,7 +80,8 @@
                   <textarea class="feedback" v-model="groups[group]['Feedback comments']" @keyup="updateGroupField($event, group, 'Feedback comments')"></textarea>
                 </td>
                 <td>
-                  <button class="btn" @click="groupFillDownFrom($index)"><i class="icon icon-downward"></i> Fill down</button>
+                  <button class="btn" @click="groupFillDownFrom($index)">
+                    <i class="icon icon-downward"></i> Fill down</button>
                 </td>
                 <td>
                   {{filenameForGroup(group)}}
@@ -135,7 +139,7 @@
       <div class="modal-overlay"></div>
       <div class="modal-container">
         <div class="modal-header">
-          <div class="modal-title">Processing Zip file</div>
+          <div class="modal-title">Processing file(s)</div>
         </div>
         <div class="modal-body">
           <div class="loading"></div>
@@ -159,11 +163,20 @@ export default {
       search: '',
       groups: {},
       files: [],
+      incomingFiles: [],
       csvDropActive: false,
       showModal: false,
       activeTab: 'G',
       groupsImportData: '',
     };
+  },
+  mounted() {
+    if (window.location.search) {
+      const url = window.location.search.split('?url=')[1];
+      this.downloadFile(url).then((data) => {
+        this.incomingFiles = data;
+      });
+    }
   },
   computed: {
     filteredStudents() {
@@ -307,14 +320,48 @@ export default {
         this.$refs.feedbackInput.value = null;
       });
     },
+    downloadFile(url) {
+      if (url.indexOf('http') === 0) {
+        return fetch(url, {
+          method: 'GET',
+        })
+          .then(response => response.blob())
+          .then((blob) => {
+            // eslint-disable-next-line
+            blob.lastModifiedDate = new Date();
+            // eslint-disable-next-line
+            blob.name = url.split('/').pop();
+            return this.addFiles([blob]);
+          });
+      }
+      return Promise.resolve([]);
+    },
     addFiles(files) {
       return Promise.all(files.map((file) => {
         if (file.name.indexOf('.zip') >= 0) {
           return this.unzip(file);
         }
+        if (file.name.indexOf('.json') >= 0) {
+          return new Promise((resolve, reject) => {
+            const fr = new FileReader();
+            fr.onload = (e) => {
+              if (e.error) {
+                reject(e.error);
+              }
+              try {
+                Promise.all(JSON.parse(e.target.result)
+                .map(url => this.downloadFile(url)))
+                .then(fileNames => resolve([].concat(...fileNames)));
+              } catch (e2) {
+                resolve();
+              }
+            };
+            fr.readAsText(file);
+          });
+        }
         this.files.push(file);
-        return Promise.resolve();
-      }));
+        return Promise.resolve(file.name);
+      })).then(fileNames => [].concat(...fileNames));
     },
   },
 };
@@ -379,12 +426,17 @@ header {
   width: 100%;
 }
 
-.list-enter-active, .list-leave-active {
+.list-enter-active,
+.list-leave-active {
   transition: all 0.5s;
 }
-.list-enter, .list-leave-to /* .list-leave-active below version 2.1.8 */ {
+
+.list-enter,
+.list-leave-to
+/* .list-leave-active below version 2.1.8 */
+
+{
   opacity: 0;
   transform: translateY(30px);
 }
-
 </style>
