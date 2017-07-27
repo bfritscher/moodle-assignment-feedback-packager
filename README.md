@@ -1,6 +1,35 @@
-# moodle-assignment-feedback-packager
+# Moodle Assignment Feedback Packager
 
-> Create a offline assignment feedback zip from csv and pdfs matched by groups.
+> Create a offline assignment feedback zip fro moodle from csv and pdfs matched by groups.
+
+## Demo
+
+https://bfritscher.github.io/moodle-assignment-feedback-packager/
+
+## Usage
+
+0. Files can be provided on startup with ?url=http://linktofiletodonwload (pdf, zip, or json array with further links to pre provision the feedback).
+
+1. Upload CSV from moodle assignments
+
+2.
+    - Set Grades by group or inidividualy
+    - If required, upload files with group names
+
+3. Export csv and zip with feedback file for each participant.
+
+
+## FAQ
+
+<dl>
+  <dt>Are my files send to a server?</dt>
+  <dd>No all is done locally in
+your browser.</dd>
+  <dt>Limitations?</dt>
+  <dd>Browser's max size of files is arround 200MB</dd>
+</dl>
+
+
 
 ## Build Setup
 

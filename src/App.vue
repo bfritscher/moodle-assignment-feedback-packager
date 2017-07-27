@@ -5,7 +5,7 @@
         <nav class="navbar">
           <section class="navbar-section">
             <a href="#" class="navbar-brand mr-10">Moodle Assignment Feedback Packager</a>
-            <a href="https://github.com/picturepan2/spectre" class="btn btn-link">GitHub</a>
+            <a href="https://github.com/bfritscher/moodle-assignment-feedback-packager" class="btn btn-link">GitHub</a>
           </section>
           <section class="navbar-section">
             <div class="input-group input-inline">
