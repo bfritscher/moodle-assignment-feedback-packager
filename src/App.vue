@@ -74,7 +74,7 @@
                   <a href="#" @click.prevent="filterGroup(group)">{{group}}</a>
                 </td>
                 <td>
-                  <input class="grade" v-model="groups[group].Grade" type="number" @keyup="updateGroupField($event, group, 'Grade')">
+                  <input class="grade" v-model="groups[group].Grade" type="number" @change="updateGroupField($event, group, 'Grade')" @keyup="updateGroupField($event, group, 'Grade')">
                 </td>
                 <td>
                   <textarea class="feedback" v-model="groups[group]['Feedback comments']" @keyup="updateGroupField($event, group, 'Feedback comments')"></textarea>
@@ -223,10 +223,15 @@ export default {
         skipEmptyLines: true,
         complete: (response) => {
           response.data.forEach((row) => {
-            this.$set(this.groups, row[0], {
-              Grade: row[1],
-              'Feedback comments': row[2],
+            const group = row[0];
+            const grade = row[1];
+            const feeback = row[2];
+            this.$set(this.groups, group, {
+              Grade: grade,
+              'Feedback comments': feeback,
             });
+            this.updateGroupField({ target: { value: grade } }, group, 'Grade');
+            this.updateGroupField({ target: { value: feeback } }, group, 'Feedback comments');
           });
         },
       });
