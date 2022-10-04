@@ -21,7 +21,8 @@
     <div class="content container grid-960">
       <div class="toast toast-error" v-if="csv.errors && csv.errors.length > 0">
         <p v-for="e in csv.errors">
-          <strong>{{e.type}} (row: {{e.row}}):</strong> {{e.message}}.</p>
+          <strong>{{e.type}} (row: {{e.row}}):</strong> {{e.message}}.
+        </p>
       </div>
       <div class="toast" v-if="incomingFiles.length > 0 && !csv.meta">
         Downloaded incoming files for you: {{incomingFiles.join(', ')}}
@@ -34,20 +35,25 @@
         <p class="empty-subtitle">Drag and drop a CSV file here, or click the button.</p>
         <div class="empty-action">
           <button class="btn btn-primary">Choose file</button>
-          <input class="file-input" type="file" ref="fileInput" accept=".csv, text/csv" @change="parse" @dragleave="csvDropActive=false" @blur="csvDropActive=false" @drop="csvDropActive=false" @dragenter="csvDropActive=true" @focus="csvDropActive=true" @click="csvDropActive=true">
+          <input class="file-input" type="file" ref="fileInput" accept=".csv, text/csv" @change="parse"
+            @dragleave="csvDropActive=false" @blur="csvDropActive=false" @drop="csvDropActive=false"
+            @dragenter="csvDropActive=true" @focus="csvDropActive=true" @click="csvDropActive=true">
         </div>
       </div>
       <div v-if="csv.meta">
 
         <ul class="tab tab-block">
           <li class="tab-item">
-            <a href="#" class="badge" :data-badge="filteredGroups.length" @click.prevent="activeTab = 'G'" :class="{active: activeTab === 'G'}">Groups</a>
+            <a href="#" class="badge" :data-badge="filteredGroups.length" @click.prevent="activeTab = 'G'"
+              :class="{active: activeTab === 'G'}">Groups</a>
           </li>
           <li class="tab-item">
-            <a href="#" class="badge" :data-badge="files.length" @click.prevent="activeTab = 'F'" :class="{active: activeTab === 'F'}">Feedback Files</a>
+            <a href="#" class="badge" :data-badge="files.length" @click.prevent="activeTab = 'F'"
+              :class="{active: activeTab === 'F'}">Feedback Files</a>
           </li>
           <li class="tab-item">
-            <a href="#" class="badge" :data-badge="filteredStudents.length" @click.prevent="activeTab = 'S'" :class="{active: activeTab === 'S'}">Participants</a>
+            <a href="#" class="badge" :data-badge="filteredStudents.length" @click.prevent="activeTab = 'S'"
+              :class="{active: activeTab === 'S'}">Participants</a>
           </li>
           <li class="tab-item tab-action ml-10">
             <div class="input-group input-inline">
@@ -61,9 +67,9 @@
           <table class="table table-striped table-hover">
             <thead>
               <tr>
-                <th>Group</th>
-                <th>Grade</th>
-                <th>Feedback comments</th>
+                <th>{{ langLookup.group }}</th>
+                <th>{{ langLookup.grade }}</th>
+                <th>{{ langLookup.feedback }}</th>
                 <th>Action</th>
                 <th>File</th>
               </tr>
@@ -74,10 +80,13 @@
                   <a href="#" @click.prevent="filterGroup(group)">{{group}}</a>
                 </td>
                 <td>
-                  <input class="grade" v-model="groups[group].Grade" type="number" @change="updateGroupField($event, group, 'Grade')" @keyup="updateGroupField($event, group, 'Grade')">
+                  <input class="grade" v-model="groups[group][langLookup.grade]" type="number"
+                    @change="updateGroupField($event, group, langLookup.grade)"
+                    @keyup="updateGroupField($event, group, langLookup.grade)">
                 </td>
                 <td>
-                  <textarea class="feedback" v-model="groups[group]['Feedback comments']" @keyup="updateGroupField($event, group, 'Feedback comments')"></textarea>
+                  <textarea class="feedback" v-model="groups[group][langLookup.feedback]"
+                    @keyup="updateGroupField($event, group, langLookup.feedback)"></textarea>
                 </td>
                 <td>
                   <button class="btn" @click="groupFillDownFrom($index)">
@@ -90,8 +99,10 @@
             </transition-group>
           </table>
           <div class="form-group">
-            <label class="form-label" for="import">Import values group, grade, comment (no header, copy past from Excel or CSV)</label>
-            <textarea class="form-input" id="import" placeholder="A01, 1, " rows="3" v-model="groupsImportData"></textarea>
+            <label class="form-label" for="import">Import values group, grade, comment (no header, copy past from Excel
+              or CSV)</label>
+            <textarea class="form-input" id="import" placeholder="A01, 1, " rows="3"
+              v-model="groupsImportData"></textarea>
           </div>
           <button class="btn btn-primary" @click="importGroupFeedback">Import</button>
         </section>
@@ -102,10 +113,12 @@
               <i class="icon icon-upload"></i>
             </div>
             <h4 class="empty-title">Drag and drop feedback files or a zip with files</h4>
-            <p class="empty-subtitle">The feeback file should include the name of a group to be matched.</p>
+            <p class="empty-subtitle">The feedback file should include the name of a group to be matched.</p>
             <div class="empty-action">
               <button class="btn btn-primary">Choose file</button>
-              <input class="file-input" type="file" ref="feedbackInput" multiple @change="handleFeedbackFiles" @dragleave="csvDropActive=false" @blur="csvDropActive=false" @drop="csvDropActive=false" @dragenter="csvDropActive=true" @focus="csvDropActive=true" @click="csvDropActive=true">
+              <input class="file-input" type="file" ref="feedbackInput" multiple @change="handleFeedbackFiles"
+                @dragleave="csvDropActive=false" @blur="csvDropActive=false" @drop="csvDropActive=false"
+                @dragenter="csvDropActive=true" @focus="csvDropActive=true" @click="csvDropActive=true">
             </div>
           </div>
           <ul>
@@ -114,7 +127,7 @@
 
         </section>
 
-        <section v-show="activeTab === 'S'">
+        <section v-show="activeTab === 'S'" style="overflow:auto">
           <table v-if="csv.meta" class="table table-striped table-hover">
             <thead>
               <tr>
@@ -122,11 +135,13 @@
               </tr>
             </thead>
             <transition-group name="list" tag="tbody">
-              <tr v-for="student in filteredStudents" :key="student.Identifier">
+              <tr v-for="student in filteredStudents" :key="student[langLookup.identifier]">
                 <td v-for="field in csv.meta.fields">
-                  <input v-if="isEditableNumber(field)" type="number" v-model="student[field]" min="0" :max="student['Maximum Grade']">
+                  <input v-if="isEditableNumber(field)" type="number" v-model="student[field]" min="0"
+                    :max="student[langLookup.gradeMax]">
                   <textarea v-else-if="isEditableTextarea(field)" v-model="student[field]"></textarea>
-                  <a v-else-if="field === 'Group'" href="#" @click.prevent="filterGroup(student[field])">{{student[field]}}</a>
+                  <a v-else-if="field === langLookup.group" href="#"
+                    @click.prevent="filterGroup(student[field])">{{student[field]}}</a>
                   <span v-else>{{student[field]}}</span>
                 </td>
               </tr>
@@ -168,6 +183,25 @@ export default {
       showModal: false,
       activeTab: 'G',
       groupsImportData: '',
+      selectedLanguage: 'en',
+      lang: {
+        en: {
+          identifierPrefixLength: 11,
+          identifier: 'Identifier',
+          group: 'Group',
+          grade: 'Grade',
+          gradeMax: 'Maximum Grade',
+          feedback: 'Feedback comments',
+        },
+        fr: {
+          identifierPrefixLength: 11,
+          identifier: 'Identifiant',
+          group: 'Groupe',
+          grade: 'Note',
+          gradeMax: 'Note maximale',
+          feedback: 'Feedback par commentaires',
+        },
+      },
     };
   },
   mounted() {
@@ -190,6 +224,9 @@ export default {
       return Object.keys(this.groups)
         .filter(group => group.toLowerCase().indexOf(this.search.toLowerCase()) > -1).sort();
     },
+    langLookup() {
+      return this.lang[this.selectedLanguage];
+    },
   },
   methods: {
     reset() {
@@ -208,11 +245,18 @@ export default {
         skipEmptyLines: true,
         complete: (response) => {
           this.csv = response;
-          [...new Set(this.csv.data.map(student => student.Group))].forEach((group) => {
-            this.$set(this.groups, group, {
-              Grade: '',
-              'Feedback comments': '',
-            });
+          // detect language
+          const foundLang = Object.keys(this.lang)
+            .find(lang => this.lang[lang].identifier === this.csv.meta.fields[0]);
+          if (foundLang) {
+            this.selectedLanguage = foundLang;
+          }
+          [...new Set(this.csv.data.map(student => student[this.langLookup.group]))]
+          .forEach((group) => {
+            const obj = {};
+            obj[this.langLookup.grade] = '';
+            obj[this.langLookup.feedback] = '';
+            this.$set(this.groups, group, obj);
           });
         },
       });
@@ -225,13 +269,13 @@ export default {
           response.data.forEach((row) => {
             const group = row[0];
             const grade = row[1];
-            const feeback = row[2];
-            this.$set(this.groups, group, {
-              Grade: grade,
-              'Feedback comments': feeback,
-            });
-            this.updateGroupField({ target: { value: grade } }, group, 'Grade');
-            this.updateGroupField({ target: { value: feeback } }, group, 'Feedback comments');
+            const feedback = row[2];
+            const obj = {};
+            obj[this.langLookup.grade] = grade;
+            obj[this.langLookup.feedback] = feedback;
+            this.$set(this.groups, group, obj);
+            this.updateGroupField({ target: { value: grade } }, group, this.langLookup.grade);
+            this.updateGroupField({ target: { value: feedback } }, group, this.langLookup.feedback);
           });
         },
       });
@@ -258,10 +302,11 @@ export default {
       this.showModal = true;
       const zip = new JSZip();
       this.csv.data.forEach((student) => {
-        const file = this.findFile(student.Group);
+        const file = this.findFile(student[this.langLookup.group]);
         if (file) {
-          const id = student.Identifier.slice(11);
-          const group = student.Group;
+          const id = student[this.langLookup.identifier]
+            .slice(this.langLookup.identifierPrefixLength);
+          const group = student[this.langLookup.group];
           const extension = file.name.split('.').pop();
           zip.file(`${group}_${id}_assignsubmission_file_Feedback-${group}.${extension}`, file);
         }
@@ -273,14 +318,14 @@ export default {
         });
     },
     isEditableNumber(field) {
-      return ['Grade'].indexOf(field) > -1;
+      return [this.langLookup.grade].indexOf(field) > -1;
     },
     isEditableTextarea(field) {
-      return ['Feedback comments'].indexOf(field) > -1;
+      return [this.langLookup.feedback].indexOf(field) > -1;
     },
     updateGroupField($event, group, field) {
       this.csv.data.forEach((student) => {
-        if (student.Group === group) {
+        if (student[this.langLookup.group] === group) {
           // eslint-disable-next-line
           student[field] = $event.target.value;
         }
@@ -289,14 +334,14 @@ export default {
     groupFillDownFrom(i) {
       const source = this.groups[this.filteredGroups[i]];
       this.filteredGroups.slice(i + 1).forEach((group) => {
-        this.groups[group].Grade = source.Grade;
-        this.groups[group]['Feedback comments'] = source['Feedback comments'];
+        this.groups[group][this.langLookup.grade] = source[this.langLookup.grade];
+        this.groups[group][this.langLookup.feedback] = source[this.langLookup.feedback];
         this.csv.data.forEach((student) => {
-          if (student.Group === group) {
+          if (student[this.langLookup.group] === group) {
             // eslint-disable-next-line
-            student.Grade = source.Grade;
+            student[this.langLookup.grade] = source[this.langLookup.grade];
             // eslint-disable-next-line
-            student['Feedback comments'] = source['Feedback comments'];
+            student[this.langLookup.feedback] = source[this.langLookup.feedback];
           }
         });
       });
@@ -314,9 +359,9 @@ export default {
           Promise.all(Object.values(zip.files).map(zipEntry => (
             zipEntry.async('uint8array').then(content => new File(content, zipEntry.name))
           ))).then(files => this.addFiles(files)))
-        , (e) => {
-          console.log(e);
-        });
+          , (e) => {
+            console.log(e);
+          });
     },
     handleFeedbackFiles() {
       this.showModal = true;
@@ -355,8 +400,8 @@ export default {
               }
               try {
                 Promise.all(JSON.parse(e.target.result)
-                .map(url => this.downloadFile(url)))
-                .then(fileNames => resolve([].concat(...fileNames)));
+                  .map(url => this.downloadFile(url)))
+                  .then(fileNames => resolve([].concat(...fileNames)));
               } catch (e2) {
                 resolve();
               }
@@ -440,7 +485,7 @@ header {
 .list-leave-to
 /* .list-leave-active below version 2.1.8 */
 
-{
+  {
   opacity: 0;
   transform: translateY(30px);
 }
