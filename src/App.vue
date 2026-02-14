@@ -101,6 +101,7 @@
             <thead>
               <tr>
                 <th>{{ langLookup.group }}</th>
+                <th>{{ langLookup.groupId }}</th>
                 <th>{{ langLookup.grade }}</th>
                 <th>{{ langLookup.feedback }}</th>
                 <th>Action</th>
@@ -111,6 +112,14 @@
               <tr v-for="(group, $index) in filteredGroups" :key="group">
                 <td>
                   <a href="#" @click.prevent="filterGroup(group)">{{ group }}</a>
+                </td>
+                <td>
+                  <input
+                    class="group-id"
+                    v-model="groups[group][langLookup.groupId]"
+                    type="text"
+                    @input="updateGroupId(group, groups[group][langLookup.groupId])"
+                  />
                 </td>
                 <td>
                   <input
@@ -147,18 +156,60 @@
             </transition-group>
           </table>
           <div class="form-group">
-            <label class="form-label" for="import"
-              >Import values group, grade, comment (no header, copy past from Excel or CSV)</label
-            >
+            <label class="form-label">Import mode</label>
+            <div class="btn-group btn-group-block">
+              <button
+                class="btn"
+                :class="{ 'btn-primary': importMode === 'groupId' }"
+                @click="importMode = 'groupId'"
+              >
+                Group → Group ID
+              </button>
+              <button
+                class="btn"
+                :class="{ 'btn-primary': importMode === 'gradeComment' }"
+                @click="importMode = 'gradeComment'"
+              >
+                Group → Grade (+ Comment)
+              </button>
+              <button
+                class="btn"
+                :class="{ 'btn-primary': importMode === 'header' }"
+                @click="importMode = 'header'"
+              >
+                Header row (groupe,id,note)
+              </button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="import">{{ importLabel }}</label>
             <textarea
               class="form-input"
               id="import"
-              placeholder="A01, 1, "
+              :placeholder="importPlaceholder"
               rows="3"
               v-model="groupsImportData"
             ></textarea>
           </div>
           <button class="btn btn-primary" @click="importGroupFeedback">Import</button>
+
+          <div class="divider text-center" data-content="OR"></div>
+          <div class="form-group">
+            <label class="form-label" for="submission-zip"
+              >Import group IDs from Moodle submission ZIP (reads file names only)</label
+            >
+            <input
+              class="form-input"
+              id="submission-zip"
+              type="file"
+              ref="submissionZipInput"
+              accept=".zip,application/zip"
+              @change="handleSubmissionZip"
+            />
+            <p v-if="submissionZipImportMessage" class="form-input-hint">
+              {{ submissionZipImportMessage }}
+            </p>
+          </div>
         </section>
 
         <section v-show="activeTab === 'F'">
@@ -250,15 +301,26 @@ import Papa from "papaparse";
 import FileSaver from "file-saver";
 import JSZip from "jszip";
 import { computed, onMounted, reactive, ref } from "vue";
+import {
+  doesFileMatchGroup,
+  resolveKnownGroupName as resolveKnownGroupNameUtil,
+} from "./groupMatching";
+import {
+  parseGroupGradeImportRow,
+  parseGroupIdImportRow,
+  parseHeaderBasedImportRow,
+} from "./groupImport";
 
 const fileInput = ref(null);
 const feedbackInput = ref(null);
+const submissionZipInput = ref(null);
 
 const lang = {
   en: {
     identifierPrefixLength: 11,
     identifier: "Identifier",
     group: "Group",
+    groupId: "Group ID",
     grade: "Grade",
     gradeMax: "Maximum Grade",
     feedback: "Feedback comments",
@@ -267,6 +329,7 @@ const lang = {
     identifierPrefixLength: 11,
     identifier: "Identifiant",
     group: "Groupe",
+    groupId: "ID du groupe",
     grade: "Note",
     gradeMax: "Note maximale",
     feedback: "Feedback par commentaires",
@@ -279,7 +342,9 @@ const incomingFiles = ref([]);
 const csvDropActive = ref(false);
 const showModal = ref(false);
 const activeTab = ref("G");
+const importMode = ref("groupId");
 const groupsImportData = ref("");
+const submissionZipImportMessage = ref("");
 const selectedLanguage = ref("en");
 const groups = reactive({});
 const csv = ref({});
@@ -307,6 +372,26 @@ const filteredGroups = computed(() => {
     .sort();
 });
 
+const importLabel = computed(() => {
+  if (importMode.value === "groupId") {
+    return "Import values group, group id (no header, copy past from Excel or CSV)";
+  }
+  if (importMode.value === "header") {
+    return "Import with header row: groupe, id, note (other columns go to HTML comment)";
+  }
+  return "Import values group, grade, comment (optional) (no header, copy past from Excel or CSV)";
+});
+
+const importPlaceholder = computed(() => {
+  if (importMode.value === "groupId") {
+    return "2-EEA-A, 157134";
+  }
+  if (importMode.value === "header") {
+    return "groupe,id,note,bonus\n2-EEA-A,157134,6,Great structure";
+  }
+  return "2-EEA-A, 6, Great work";
+});
+
 function clearGroups() {
   Object.keys(groups).forEach((group) => {
     delete groups[group];
@@ -317,7 +402,40 @@ function reset() {
   csv.value = {};
   files.value = [];
   search.value = "";
+  submissionZipImportMessage.value = "";
+  csvDropActive.value = false;
+
+  if (fileInput.value) {
+    fileInput.value.value = null;
+  }
+  if (feedbackInput.value) {
+    feedbackInput.value.value = null;
+  }
+  if (submissionZipInput.value) {
+    submissionZipInput.value.value = null;
+  }
+
   clearGroups();
+}
+
+function ensureGroup(group) {
+  if (!groups[group]) {
+    groups[group] = {
+      [langLookup.value.groupId]: "",
+      [langLookup.value.grade]: "",
+      [langLookup.value.feedback]: "",
+    };
+    return;
+  }
+  if (typeof groups[group][langLookup.value.groupId] === "undefined") {
+    groups[group][langLookup.value.groupId] = "";
+  }
+  if (typeof groups[group][langLookup.value.grade] === "undefined") {
+    groups[group][langLookup.value.grade] = "";
+  }
+  if (typeof groups[group][langLookup.value.feedback] === "undefined") {
+    groups[group][langLookup.value.feedback] = "";
+  }
 }
 
 function parse() {
@@ -345,10 +463,7 @@ function parse() {
 
       [...new Set(csv.value.data.map((student) => student[langLookup.value.group]))].forEach(
         (group) => {
-          groups[group] = {
-            [langLookup.value.grade]: "",
-            [langLookup.value.feedback]: "",
-          };
+          ensureGroup(group);
         },
       );
     },
@@ -364,23 +479,72 @@ function updateGroupField(group, field, value) {
 }
 
 function importGroupFeedback() {
+  const useHeaderImport = importMode.value === "header";
+
   Papa.parse(groupsImportData.value, {
-    header: false,
+    header: useHeaderImport,
     skipEmptyLines: true,
     complete: (response) => {
       response.data.forEach((row) => {
-        const group = row[0];
-        const grade = row[1];
-        const feedback = row[2];
-        groups[group] = {
-          [langLookup.value.grade]: grade,
-          [langLookup.value.feedback]: feedback,
-        };
-        updateGroupField(group, langLookup.value.grade, grade);
-        updateGroupField(group, langLookup.value.feedback, feedback);
+        let parsedRow;
+        if (importMode.value === "groupId") {
+          parsedRow = parseGroupIdImportRow(row);
+        } else if (importMode.value === "header") {
+          parsedRow = parseHeaderBasedImportRow(row);
+        } else {
+          parsedRow = parseGroupGradeImportRow(row);
+        }
+
+        if (!parsedRow) {
+          return;
+        }
+
+        const group = resolveKnownGroupName(parsedRow.group);
+        if (!group) {
+          return;
+        }
+
+        ensureGroup(group);
+
+        if (importMode.value === "groupId") {
+          if (parsedRow.groupId) {
+            groups[group][langLookup.value.groupId] = parsedRow.groupId;
+          }
+          return;
+        }
+
+        if (importMode.value === "header") {
+          if (parsedRow.groupId) {
+            groups[group][langLookup.value.groupId] = parsedRow.groupId;
+          }
+          if (parsedRow.grade !== null) {
+            groups[group][langLookup.value.grade] = parsedRow.grade;
+            updateGroupField(group, langLookup.value.grade, parsedRow.grade);
+          }
+          if (parsedRow.feedback !== null) {
+            groups[group][langLookup.value.feedback] = parsedRow.feedback;
+            updateGroupField(group, langLookup.value.feedback, parsedRow.feedback);
+          }
+          return;
+        }
+
+        if (parsedRow.grade !== null) {
+          groups[group][langLookup.value.grade] = parsedRow.grade;
+          updateGroupField(group, langLookup.value.grade, parsedRow.grade);
+        }
+
+        if (parsedRow.feedback !== null) {
+          groups[group][langLookup.value.feedback] = parsedRow.feedback;
+          updateGroupField(group, langLookup.value.feedback, parsedRow.feedback);
+        }
       });
     },
   });
+}
+
+function updateGroupId(group, value) {
+  ensureGroup(group);
+  groups[group][langLookup.value.groupId] = value;
 }
 
 function unparse() {
@@ -394,7 +558,7 @@ function unparse() {
 }
 
 function findFile(group) {
-  return files.value.find((file) => file.name.indexOf(group) > -1);
+  return files.value.find((file) => doesFileMatchGroup(file.name, group, Object.keys(groups)));
 }
 
 function filenameForGroup(group) {
@@ -406,13 +570,13 @@ async function zip() {
   showModal.value = true;
   try {
     const zipFile = new JSZip();
-    csv.value.data.forEach((student) => {
-      const file = findFile(student[langLookup.value.group]);
+    Object.keys(groups).forEach((group) => {
+      const file = findFile(group);
       if (file) {
-        const id = student[langLookup.value.identifier].slice(
-          langLookup.value.identifierPrefixLength,
-        );
-        const group = student[langLookup.value.group];
+        const id = resolveGroupId(group);
+        if (!id) {
+          return;
+        }
         const extension = file.name.split(".").pop();
         zipFile.file(`${group}_${id}_assignsubmission_file_Feedback-${group}.${extension}`, file);
       }
@@ -451,6 +615,66 @@ function filterGroup(group) {
     search.value = "";
   } else {
     search.value = group;
+  }
+}
+
+function resolveKnownGroupName(value) {
+  return resolveKnownGroupNameUtil(value, Object.keys(groups));
+}
+
+function resolveGroupId(group) {
+  const explicitGroupId = String(groups[group]?.[langLookup.value.groupId] ?? "").trim();
+  return explicitGroupId;
+}
+
+function extractGroupAndIdFromSubmissionFileName(fileName) {
+  const baseName = (fileName || "").split("/").pop() || "";
+  const match = baseName.match(/^(.*)_(\d+)_assignsubmission_/i);
+  if (!match) {
+    return null;
+  }
+  return {
+    group: match[1].trim(),
+    id: match[2],
+  };
+}
+
+function matchExistingGroup(groupName) {
+  return resolveKnownGroupName(groupName);
+}
+
+async function handleSubmissionZip() {
+  const selectedFile = submissionZipInput.value?.files?.[0];
+  if (!selectedFile) {
+    return;
+  }
+
+  showModal.value = true;
+  try {
+    const zipObj = await JSZip.loadAsync(selectedFile);
+    const imported = new Set();
+
+    Object.values(zipObj.files)
+      .filter((zipEntry) => !zipEntry.dir)
+      .forEach((zipEntry) => {
+        const extracted = extractGroupAndIdFromSubmissionFileName(zipEntry.name);
+        if (!extracted || !extracted.group || !extracted.id) {
+          return;
+        }
+        const matchedGroup = matchExistingGroup(extracted.group);
+        ensureGroup(matchedGroup);
+        groups[matchedGroup][langLookup.value.groupId] = extracted.id;
+        imported.add(matchedGroup);
+      });
+
+    submissionZipImportMessage.value = `Imported group IDs for ${imported.size} group(s).`;
+  } catch {
+    submissionZipImportMessage.value = "Could not read group IDs from ZIP file.";
+  } finally {
+    if (submissionZipInput.value) {
+      submissionZipInput.value.value = null;
+    }
+    showModal.value = false;
   }
 }
 
@@ -595,6 +819,10 @@ header {
 
 .grade {
   width: 5rem;
+}
+
+.group-id {
+  width: 8rem;
 }
 
 .feedback {
